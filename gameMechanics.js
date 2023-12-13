@@ -87,11 +87,43 @@ const pieces = {
 // selects piece 
 var selectedPiece = '';
 var changePiece = true;
+var editPiece = true;
+
 function selectColor() {
     if (changePiece == true){
         selectedPiece = this.id;
         drawPiece(pieces[selectedPiece],selectedPiece);
+    } else if (changePiece == false) {
+        selectedPiece = this.id;
+        const pieceValue = Object.keys(pieces).indexOf(selectedPiece);
+        const piece = modifiedPieces[pieceValue];
+
+        var move = false;
+        var previousColor = "";
+        // conditional sees if the pieceboard already has a piece and retrieves the color of piece if there is one
+        for (i=0;i<piece.length;i++) {
+            for (j=0;j<piece.length;j++) {
+                hole = document.querySelector(`.overlayr${i+1}#c${j+1}`);
+                if (hole.classList[2]=="piece-object") {
+                    // gets the color of the piece thats on the board, then removes the class from the hole.
+                    move = true
+                    previousColor = hole.classList[3]
+                    hole.classList.remove(previousColor)
+                }
+            }
+        }
+
+        
+        if (move==true) {
+            drawPiece(pieces[selectedPiece],selectedPiece);
+            enableButton(previousColor);
+        }
+        console.log("\n",move,"\n")
+
+        
+        
     }
+
 }
 
 function resetPiece() {
@@ -99,6 +131,7 @@ function resetPiece() {
     pieceOverlayHoles.forEach(function(hole) {
         hole.style.backgroundColor = "var(--transparent)";  
         hole.classList.remove("piece-object");
+        hole.classList.remove(selectedPiece)
     })
     pieceBoard.style.display = "unset";
 }
@@ -107,7 +140,7 @@ function resetPiece() {
 function drawPiece(piece,color) {
     // resets board
     resetPiece()
-
+    editPiece = true;
     // draws piece
     for (i=0;i<piece.length;i++){
         for (j=0;j<piece[i].length;j++) {
@@ -116,10 +149,28 @@ function drawPiece(piece,color) {
                 if (hole) {
                     hole.style.backgroundColor = `var(--piece-${color}`; 
                     hole.classList.add("piece-object");
+                    hole.classList.add(`${selectedPiece}`);
+                    disableButton();
                 } 
             }
         }
     }
+    changePiece = false
+}
+
+// Disables the buttons on the color menu when the piece is on the board
+function disableButton() {
+    // removes event listener, and sets class to disabled.
+    const pieceValue = Object.keys(pieces).indexOf(selectedPiece)
+    colorElements[pieceValue].removeEventListener("click",selectColor);
+    colorElements[pieceValue].classList.add("disabled");
+}
+
+// undoes all the operations done within the disableButton function of specified color
+function enableButton(color) {
+    const pieceValue = Object.keys(pieces).indexOf(color)
+    colorElements[pieceValue].addEventListener("click",selectColor);
+    colorElements[pieceValue].classList.remove("disabled");
 }
 
 // Adds function to color buttons
@@ -187,21 +238,30 @@ function reverseRow(matrix) {
     }
 }
 function rotateRight() {
-    piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
-    rowToColumn(piece);
-    reverseColumn(piece);
-    drawPiece(piece,selectedPiece);
+    if (editPiece==true) {
+        piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
+        rowToColumn(piece);
+        reverseColumn(piece);
+        drawPiece(piece,selectedPiece);
+    }
+    
 }
 function rotateLeft() {
-    piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
-    rowToColumn(piece);
-    reverseRow(piece);
-    drawPiece(piece,selectedPiece);
+    if (editPiece==true) {
+        piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
+        rowToColumn(piece);
+        reverseRow(piece);
+        drawPiece(piece,selectedPiece);
+    }
+    
 }
 function flip() {
-    piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
-    reverseColumn(piece);
-    drawPiece(piece,selectedPiece);
+    if (editPiece==true) {
+        piece = modifiedPieces[Object.keys(pieces).indexOf(selectedPiece)]
+        reverseColumn(piece);
+        drawPiece(piece,selectedPiece);
+    }
+    
 }
 
 rotateRightButton.addEventListener("click", rotateRight)
@@ -225,16 +285,33 @@ var gameBoard = document.querySelector("#game-board");
 var currentX = parseInt(pieceBoard.style.left);
 var currentY = parseInt(pieceBoard.style.bottom); 
 
+// Default offset
+var offsetX = 0;
+var offsetY = 0;
+
+resizePiece(gameBoardHoles[0].offsetWidth);
+
 // deals with logic behind moving the piece
 function mouseMovement(event) {
-    resizePiece(pieceBoardHoles[0].offsetWidth)
+    resizePiece(pieceBoardHoles[0].offsetWidth);
+
     // mouse original click
     initX = event.clientX;
     initY = event.clientY;
- 
+
     // pieces current position
     currentX = parseInt(pieceBoard.style.left);
     currentY = parseInt(pieceBoard.style.bottom);
+
+    // Sets offset to the distance between bottom left corner of overlay to the point clicked, then scale it to the ratio that it will be shrunk down to.
+    var overlayBox = pieceBoard.getBoundingClientRect();
+    var scale = (gameBoardHoles[0].offsetWidth)/(pieceBoardHoles[0].offsetWidth);
+    
+    // offsetX = ((initX-overlayBox.left)*scale);
+    // offsetY = ((initY-overlayBox.bottom)*scale);
+    offsetX = 0;
+    offsetY = 0;
+    
     
     // Move with mouse
     document.addEventListener('mousemove', movePiece); 
@@ -252,20 +329,26 @@ function touchMovement(event) {
     currentX = parseInt(pieceBoard.style.left);
     currentY = parseInt(pieceBoard.style.bottom);
 
+    // Sets offset to the distance between bottom left corner of overlay to the point clicked, then scale it to the ratio that it will be shrunk down to.
+    var overlayBox = pieceBoard.getBoundingClientRect();
+    var scale = (gameBoardHoles[0].offsetWidth)/(pieceBoardHoles[0].offsetWidth);
+    
+    offsetX = ((initX-overlayBox.left)*scale);
+    offsetY = ((initY-overlayBox.bottom)*scale);
+
     document.addEventListener('touchmove', movePiece, { passive: false});
 }
 
 // is called whenever mouse/touch moves on the screen
 function movePiece(event) {
     event.preventDefault();
-    
     const touchEvent = event.touches ? event.touches[0] : event;
 
     // Finds distance between original click point and new mouse position, then adds value to the piece's position
-    const x = currentX + (touchEvent.clientX - initX);
-    const y = currentY + (initY - touchEvent.clientY);
+    const x = currentX + ((touchEvent.clientX - initX)+offsetX);
+    const y = currentY + ((touchEvent.clientY - initY)+offsetY);    
     
-    pieceBoard.style.bottom = y+"px";
+    pieceBoard.style.bottom = -y+"px";
     pieceBoard.style.left = x+"px";
 }
 
@@ -323,8 +406,8 @@ function pieceRelease(event) {
             filledHoles[i].classList.add(`${selectedPiece}`);
             filledHoles[i].addEventListener("click",movePieceOnBoard);
         }
-        resetPiece();  
-        disableButton();
+        resetPiece();
+        editPiece=false;
         changePiece = true;
     }
     resizePiece(gameBoardHoles[0].offsetWidth);
@@ -347,55 +430,64 @@ function resizePiece(size) {
 
     pieceBoard.style.width = "fit-content";
     pieceBoard.style.height = "fit-content";
+    // console.log("width",pieceBoard.offsetWidth)
 }
 
-function disableButton() {
-    const pieceValue = Object.keys(pieces).indexOf(selectedPiece)
-    colorElements[pieceValue].removeEventListener("click",selectColor);
-    colorElements[pieceValue].classList.add("disabled");
-    selectedPiece = '';
-}
 
 
 function movePieceOnBoard(event) {
     const color = event.target.classList[3]
     const pieceValue = Object.keys(pieces).indexOf(color)
     const piece = modifiedPieces[pieceValue]
-    const move = 0;
-
-    // need to add conditional to only add piece if display is empty
+    var move = 0;
+    var previousColor = "";
+    // conditional sees if the pieceboard already has a piece and retrieves the color of piece if there is one
     for (i=0;i<piece.length;i++) {
         for (j=0;j<piece.length;j++) {
             hole = document.querySelector(`.overlayr${i+1}#c${j+1}`);
             if (hole.classList[2]=="piece-object") {
                 move += 1;
+                if (move >=1) {
+                    previousColor = hole.classList[3]
+                }
             }
         }}
 
-    // resets all pieces with the same color that was clicked
+
+    // if move is greater than 0, get the current color, reactive the button, reset the piece
+    if (move > 0) {
+        resetPiece()
+        enableButton(previousColor)
+    }
+
+    // resets all pieces with the same color on the gameboard that was clicked 
     gameBoardHoles.forEach(function(gameHole){
-        if (gameHole.classList[3]==color && move == 0) {
+        if (gameHole.classList[3]==color) {
             gameHole.style.backgroundColor = "var(--hole-color)";
             gameHole.classList.remove("piece-object");
             gameHole.classList.remove(`${color}`);
         }
     })
-    // resets the piece to the overlay
+
+    // readds the piece to the overlay
     for (i=0;i<piece.length;i++) {
         for (j=0;j<piece.length;j++) {
-            if (piece[i][j] != 0 && move == 0) {
+            if (piece[i][j] != 0) {
                 hole = document.querySelector(`.overlayr${i+1}#c${j+1}`);
                 if (hole) {
                     hole.style.backgroundColor = `var(--piece-${color}`; 
                     hole.classList.add("piece-object");
+                    hole.classList.add(color);
                 } 
             }
         }
     }
     
+    
     selectedPiece = color;
     changePiece = false;
 }
+
 
 // Functionality for when mouse is clicked, dragged, and released
 for (i=0;i<pieceOverlayHoles.length;i++) {
@@ -429,14 +521,7 @@ for (i=0;i<pieceOverlayHoles.length;i++) {
 }
 
 
-// FEATURES TO ADD
-// when moving piece on board, have it drag instead of reset
-
-// Fix Bugs
 
 
-// BUGS
-// You can see the piece glitch when it's reset.
-// piece moves away from point of dragging when it shrinks
 
 
